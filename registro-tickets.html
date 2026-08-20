@@ -407,43 +407,64 @@ function resetUploadArea() {
 }
 
 /* ---------------- drive upload ---------------- */
+async function apiCall(url, options) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (data && data.error && data.error.message) ? data.error.message : `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
 async function ensureFolder() {
+  // discard any previously cached invalid id (e.g. the literal string "undefined")
+  if (folderId && (folderId === 'undefined' || folderId === 'null')) {
+    folderId = null;
+    localStorage.removeItem('ticketsFolderId');
+  }
   if (folderId) return folderId;
+
   const q = encodeURIComponent("name='TicketsGastos' and mimeType='application/vnd.google-apps.folder' and trashed=false");
-  const listRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+  const listRes = await apiCall(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
     headers: { Authorization: 'Bearer ' + accessToken }
-  }).then(r => r.json());
+  });
+
   if (listRes.files && listRes.files.length) {
     folderId = listRes.files[0].id;
   } else {
-    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    const createRes = await apiCall('https://www.googleapis.com/drive/v3/files', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'TicketsGastos', mimeType: 'application/vnd.google-apps.folder' })
-    }).then(r => r.json());
+    });
     folderId = createRes.id;
   }
+
+  if (!folderId) throw new Error('No se pudo crear ni encontrar la carpeta TicketsGastos en Drive.');
   localStorage.setItem('ticketsFolderId', folderId);
   return folderId;
 }
 
 async function uploadToDrive(file, fileName) {
   const fId = await ensureFolder();
-  const metaRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+
+  const metaRes = await apiCall('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: fileName, parents: [fId] })
-  }).then(r => r.json());
+  });
+  if (!metaRes.id) throw new Error('Google no devolvió un ID de archivo al crearlo.');
 
-  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${metaRes.id}?uploadType=media`, {
+  await apiCall(`https://www.googleapis.com/upload/drive/v3/files/${metaRes.id}?uploadType=media`, {
     method: 'PATCH',
     headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': file.type },
     body: file
   });
 
-  const info = await fetch(`https://www.googleapis.com/drive/v3/files/${metaRes.id}?fields=webViewLink`, {
+  const info = await apiCall(`https://www.googleapis.com/drive/v3/files/${metaRes.id}?fields=webViewLink`, {
     headers: { Authorization: 'Bearer ' + accessToken }
-  }).then(r => r.json());
+  });
 
   return info.webViewLink;
 }
