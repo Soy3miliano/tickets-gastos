@@ -465,8 +465,9 @@ async function runGeminiAI(imageUrl) {
 
     statusText.textContent = 'La IA de Google está analizando el ticket...';
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
-  const payload = {
+    // ¡Aquí está el modelo actualizado a 3.5!
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
+    const payload = {
       contents: [{
         parts: [
           { text: `Eres un experto asistente financiero. Lee cuidadosamente este ticket y devuelve un JSON estrictamente válido. 
@@ -483,15 +484,38 @@ async function runGeminiAI(imageUrl) {
       }
     };
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    let res;
+    let retries = 3; // Número de intentos antes de rendirse
 
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error?.message || `Error HTTP ${res.status}`);
+    // Bucle de reintento automático
+    while (retries > 0) {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        break; // Si la petición fue exitosa, salimos del bucle
+      }
+
+      // 503: Service Unavailable (Saturado), 429: Too Many Requests
+      if (res.status === 503 || res.status === 429 || res.status === 500) {
+        retries--;
+        if (retries > 0) {
+          statusText.textContent = `Servidor saturado, reintentando... (${retries} intentos restantes)`;
+          // Esperamos 2 segundos antes de volver a intentar
+          await new Promise(r => setTimeout(r, 2000));
+        } else {
+          // Si nos quedamos sin intentos, lanzamos el error
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error?.message || `Servidor saturado tras varios intentos (HTTP ${res.status})`);
+        }
+      } else {
+        // Para cualquier otro error abortamos de inmediato
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `Error HTTP ${res.status}`);
+      }
     }
 
     const data = await res.json();
