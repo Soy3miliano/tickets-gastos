@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Tickets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Tesseract.js eliminado, usamos la API de Gemini mediante fetch nativo -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#FAF7EF;
+    --paper-2:#F1EBDB;
+    --ink:#20242B;
+    --ink-soft:#5B6270;
+    --line:#D9D2BF;
+    --teal:#2B6E63;
+    --teal-dark:#1E4E46;
+    --brick:#A6402F;
+    --gold:#B98A2E;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.5;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:36px 20px 80px;}
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--teal-dark);
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:38px;
+    margin:0 0 6px;
+    letter-spacing:-.01em;
+  }
+  .sub{color:var(--ink-soft);font-size:15px;max-width:560px;}
+
+  .card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:22px 24px;
+    margin-bottom:20px;
+    box-shadow:0 1px 0 rgba(0,0,0,.02);
+  }
+  .card h2{
+    font-family:'Fraunces',serif;
+    font-size:18px;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .card h2 .n{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:#fff;
+    background:var(--teal);
+    width:20px;height:20px;
+    border-radius:50%;
+    display:inline-flex;
+    align-items:center;justify-content:center;
+  }
+  .hint{color:var(--ink-soft);font-size:13.5px;margin:2px 0 14px;}
+
+  /* config panel */
+  #configBody{display:none;}
+  #configBody.open{display:block;}
+  .toggle-row{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+  
+  .status-container { display:flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .status-pill{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    padding:3px 9px;
+    border-radius:20px;
+    background:var(--paper-2);
+    color:var(--ink-soft);
+    border:1px solid var(--line);
+  }
+  .status-pill.ok{background:#E7F1EC;color:var(--teal-dark);border-color:#BFDCCF;}
+
+  ol.steps{padding-left:20px;font-size:14px;color:var(--ink);}
+  ol.steps li{margin-bottom:6px;}
+  ol.steps a{color:var(--teal-dark);}
+  code.inline{background:var(--paper-2);padding:1px 6px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:13px;}
+
+  input[type=text], input[type=number], input[type=password]{
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    padding:9px 11px;
+    border:1px solid var(--line);
+    border-radius:7px;
+    background:var(--paper);
+    width:100%;
+  }
+  input:focus{outline:2px solid var(--teal);outline-offset:1px;}
+
+  .row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+  .row > *{flex:1;min-width:180px;}
+
+  button{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    border:none;
+    border-radius:7px;
+    padding:10px 16px;
+    cursor:pointer;
+    transition:transform .05s ease;
+  }
+  button:active{transform:scale(.98);}
+  .btn-primary{background:var(--teal);color:#fff;}
+  .btn-primary:hover{background:var(--teal-dark);}
+  .btn-ghost{background:transparent;color:var(--teal-dark);border:1px solid var(--teal);}
+  .btn-brick{background:var(--brick);color:#fff;}
+  button:disabled{opacity:.45;cursor:not-allowed;}
+
+  /* dropzone */
+  #dropzone{
+    border:2px dashed var(--line);
+    border-radius:10px;
+    padding:34px 20px;
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:14px;
+    cursor:pointer;
+    background:var(--paper-2);
+    transition:border-color .15s;
+  }
+  #dropzone.drag{border-color:var(--teal);color:var(--teal-dark);}
+  #dropzone strong{color:var(--ink);}
+
+  #previewArea{display:none;margin-top:16px;}
+  #previewArea.open{display:flex;gap:18px;flex-wrap:wrap;}
+  #previewImg{
+    max-width:200px;max-height:260px;
+    border-radius:6px;border:1px solid var(--line);
+    object-fit:contain;background:var(--paper-2);
+  }
+  .fields{flex:1;min-width:260px;}
+  label{
+    display:block;font-size:12px;font-weight:600;
+    color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;
+    margin:10px 0 4px;
+  }
+  label:first-child{margin-top:0;}
+  .ocr-text{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;color:var(--ink-soft);
+    background:var(--paper-2);border-radius:6px;padding:10px;
+    max-height:120px;overflow:auto;white-space:pre-wrap;margin-top:8px;
+  }
+  details summary{cursor:pointer;font-size:12.5px;color:var(--teal-dark);margin-top:8px;}
+
+  .ocr-status{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal-dark);
+    display:none;align-items:center;gap:6px;margin-top:8px;
+  }
+  .ocr-status.show{display:flex;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pulse 1s infinite;}
+  @keyframes pulse{50%{opacity:.2;}}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px;}
+  thead th{
+    text-align:left;font-family:'IBM Plex Mono',monospace;font-size:11px;
+    text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);
+    border-bottom:1px solid var(--line);padding:8px 8px;
+  }
+  tbody td{padding:9px 8px;border-bottom:1px solid var(--paper-2);vertical-align:top;}
+  tbody tr:hover{background:var(--paper-2);}
+  .money{font-family:'IBM Plex Mono',monospace;color:var(--brick);text-align:right;}
+  .link-cell a{color:var(--teal-dark);font-size:12.5px;}
+  .del-btn{background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:16px;padding:0 4px;}
+  .del-btn:hover{color:var(--brick);}
+  .empty-row td{text-align:center;color:var(--ink-soft);padding:26px;font-size:13.5px;}
+
+  footer{margin-top:6px;text-align:center;color:var(--ink-soft);font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Bitácora de gastos</div>
+    <h1>Registro de Tickets</h1>
+    <div class="sub">Sube o pega la foto de un ticket, revisa los datos extraídos con IA, y guarda la fila. Al final exportas todo a un archivo .xlsx con el link de cada foto en Drive.</div>
+  </header>
+
+  <!-- STEP 1: CONFIG -->
+  <div class="card">
+    <div class="toggle-row" id="configToggle">
+      <h2><span class="n">1</span>Configuración y APIs</h2>
+      <div class="status-container">
+        <span class="status-pill" id="geminiStatus">IA no conectada</span>
+        <span class="status-pill" id="driveStatus">Drive no conectado</span>
+      </div>
+    </div>
+    <div class="hint">Tus credenciales se guardan localmente en tu navegador para proteger tu seguridad.</div>
+    <div id="configBody">
+      <!-- Configuración Gemini -->
+      <details style="margin-bottom: 12px;">
+        <summary>Configurar Inteligencia Artificial (Gemini)</summary>
+        <ol class="steps" style="margin-top: 8px;">
+          <li>Entra a <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a> (es gratis).</li>
+          <li>Haz clic en "Create API key" y cópiala.</li>
+          <li>Pégala abajo y guárdala. Esto permitirá que la IA lea tus tickets estructurados.</li>
+        </ol>
+        <div class="row">
+          <input type="password" id="geminiKeyInput" placeholder="Pega aquí tu API Key de Gemini">
+          <button class="btn-primary" id="saveGeminiKey" style="max-width: 200px;">Guardar IA</button>
+        </div>
+      </details>
+
+      <hr style="border: 0; border-top: 1px solid var(--line); margin: 16px 0;">
+
+      <!-- Configuración Drive -->
+      <details>
+        <summary>Configurar subida a Google Drive</summary>
+        <ol class="steps" style="margin-top: 8px;">
+          <li>Entra a <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> y crea un proyecto.</li>
+          <li>Ve a <strong>APIs y servicios → Biblioteca</strong> y activa <em>Google Drive API</em>.</li>
+          <li>En <strong>Pantalla de consentimiento OAuth</strong>, elige "Externo" y agrega tu correo a usuarios de prueba.</li>
+          <li>En <strong>Credenciales</strong> crea un <em>ID de cliente OAuth</em> (Aplicación Web). Añade el origen de tu servidor.</li>
+          <li>Pega abajo el Client ID (termina en <code class="inline">.apps.googleusercontent.com</code>).</li>
+        </ol>
+      </details>
+      <div class="row" style="margin-top:14px;">
+        <input type="text" id="clientIdInput" placeholder="Client ID: XXXXXXXX.apps.googleusercontent.com">
+        <button class="btn-primary" id="saveClientId" style="max-width: 140px;">Guardar</button>
+        <button class="btn-ghost" id="connectBtn" disabled style="max-width: 160px;">Conectar Drive</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: UPLOAD -->
+  <div class="card">
+    <h2><span class="n">2</span>Foto del ticket</h2>
+    <div class="hint">Arrastra la imagen, pégala con Ctrl+V, o elígela desde tu computadora.</div>
+    <div id="dropzone">
+      <strong>Suelta la imagen aquí</strong>, pégala con Ctrl+V, o
+      <span style="text-decoration:underline;color:var(--teal-dark);">haz clic para elegir un archivo</span>
+      <input type="file" id="fileInput" accept="image/*" style="display:none;">
+    </div>
+    <div class="ocr-status" id="ocrStatus"><span class="dot"></span><span id="ocrStatusText">Leyendo el ticket…</span></div>
+
+    <div id="previewArea">
+      <img id="previewImg" alt="Vista previa del ticket">
+      <div class="fields">
+        <label for="fCiudad">Ciudad</label>
+        <input type="text" id="fCiudad" placeholder="Guadalajara">
+        <label for="fFecha">Fecha</label>
+        <input type="text" id="fFecha" placeholder="dd-mmm-aa">
+        <label for="fConcepto">Concepto</label>
+        <input type="text" id="fConcepto" placeholder="Comida">
+        <label for="fMonto">Monto total (MXN)</label>
+        <input type="number" step="0.01" id="fMonto" placeholder="0.00">
+        <label for="fComentarios">Comentarios</label>
+        <input type="text" id="fComentarios" placeholder="(opcional)">
+        
+        <details style="margin-top:10px;">
+          <summary>JSON devuelto por Gemini</summary>
+          <div class="ocr-text" id="ocrRaw">—</div>
+        </details>
+        
+        <div class="row" style="margin-top:16px;">
+          <button class="btn-primary" id="saveRowBtn">Subir a Drive y guardar fila</button>
+          <button class="btn-ghost" id="cancelRowBtn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: TABLE -->
+  <div class="card">
+    <h2><span class="n">3</span>Filas registradas (<span id="rowCount">0</span>)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Ciudad</th><th>Fecha</th><th>Concepto</th><th>Monto</th><th>Foto</th><th>Comentarios</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr class="empty-row"><td colspan="7">Todavía no hay filas. Registra tu primer ticket arriba.</td></tr>
+      </tbody>
+    </table>
+    <div class="row" style="margin-top:18px;">
+      <button class="btn-brick" id="exportBtn">Exportar a Excel (.xlsx)</button>
+    </div>
+  </div>
+
+  <footer>Todo se procesa de manera segura. Las fotos van a tu Drive y el análisis usa la cuota gratuita de Gemini.</footer>
+</div>
+
+<script>
+/* ---------------- state ---------------- */
+let entries = JSON.parse(localStorage.getItem('ticketsEntries') || '[]');
+function saveEntries() { localStorage.setItem('ticketsEntries', JSON.stringify(entries)); }
+let currentFile = null;
+let accessToken = null;
+let tokenClient = null;
+let folderId = localStorage.getItem('ticketsFolderId') || null;
+
+/* ---------------- config panel (Drive & Gemini) ---------------- */
+const configToggle = document.getElementById('configToggle');
+const configBody = document.getElementById('configBody');
+configToggle.addEventListener('click', () => configBody.classList.toggle('open'));
+
+// Drive Logic
+const savedClientId = localStorage.getItem('ticketsClientId');
+if (savedClientId) {
+  document.getElementById('clientIdInput').value = savedClientId;
+  loadGoogleScript(savedClientId); 
+  document.getElementById('connectBtn').disabled = false;
+}
+
+document.getElementById('saveClientId').addEventListener('click', () => {
+  const val = document.getElementById('clientIdInput').value.trim();
+  if (!val.endsWith('.apps.googleusercontent.com')) {
+    alert('Ese no parece un Client ID válido de Google.');
+    return;
+  }
+  localStorage.setItem('ticketsClientId', val);
+  document.getElementById('connectBtn').disabled = false;
+  loadGoogleScript(val);
+  alert('Client ID guardado localmente.');
+});
+
+function loadGoogleScript(clientId) {
+  if (window.google && google.accounts) { setupTokenClient(clientId); return; }
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.onload = () => setupTokenClient(clientId);
+  document.head.appendChild(s);
+}
+
+function setupTokenClient(clientId) {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: (resp) => {
+      if (resp.error) { alert('No se pudo conectar: ' + resp.error); return; }
+      accessToken = resp.access_token;
+      const pill = document.getElementById('driveStatus');
+      pill.textContent = 'Drive conectado';
+      pill.classList.add('ok');
+    }
+  });
+}
+
+document.getElementById('connectBtn').addEventListener('click', () => {
+  if (!tokenClient) { alert('Primero guarda tu Client ID.'); return; }
+  tokenClient.requestAccessToken();
+});
+
+// Gemini Logic
+const savedGeminiKey = localStorage.getItem('ticketsGeminiKey');
+if (savedGeminiKey) {
+  document.getElementById('geminiKeyInput').value = savedGeminiKey;
+  const pill = document.getElementById('geminiStatus');
+  pill.textContent = 'IA conectada';
+  pill.classList.add('ok');
+}
+
+document.getElementById('saveGeminiKey').addEventListener('click', () => {
+  const val = document.getElementById('geminiKeyInput').value.trim();
+  if (!val) {
+    alert('Por favor, ingresa una API Key válida.');
+    return;
+  }
+  localStorage.setItem('ticketsGeminiKey', val);
+  const pill = document.getElementById('geminiStatus');
+  pill.textContent = 'IA conectada';
+  pill.classList.add('ok');
+  alert('API Key de Gemini guardada localmente.');
+});
+
+if (!savedClientId && !savedGeminiKey) configBody.classList.add('open');
+
+/* ---------------- image intake ---------------- */
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+window.addEventListener('paste', e => {
+  const items = e.clipboardData.items;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) { handleFile(item.getAsFile()); break; }
+  }
+});
+
+function handleFile(file) {
+  currentFile = file;
+  const url = URL.createObjectURL(file);
+  document.getElementById('previewImg').src = url;
+  document.getElementById('previewArea').classList.add('open');
+  ['fCiudad','fFecha','fConcepto','fMonto','fComentarios'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ocrRaw').textContent = '—';
+  
+  // Ejecuta la lectura con Gemini
+  runGeminiAI(url);
+}
+
+/* ---------------- Pre-procesamiento de base64 ---------------- */
+function getBase64FromUrl(imageUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        // Reducimos la imagen un poco para no gastar tanto ancho de banda hacia la API
+        const scale = Math.min(1000 / Math.max(img.width, img.height), 1);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.8)); // Exportar en JPG ligero
+      } catch (e) { reject(e); }
+    };
+    img.onerror = reject;
+    img.src = imageUrl;
+  });
+}
+
+/* ---------------- Gemini AI ---------------- */
+async function runGeminiAI(imageUrl) {
+  const apiKey = localStorage.getItem('ticketsGeminiKey');
+  const statusEl = document.getElementById('ocrStatus');
+  const statusText = document.getElementById('ocrStatusText');
+  
+  if (!apiKey) {
+    statusEl.classList.add('show');
+    statusText.textContent = 'Falta configurar la API Key de Gemini en el paso 1. Llena el ticket a mano.';
+    setTimeout(() => statusEl.classList.remove('show'), 5000);
+    return;
+  }
+
+  statusEl.classList.add('show');
+  statusText.textContent = 'Preparando imagen...';
+
+  try {
+    const base64Image = await getBase64FromUrl(imageUrl);
+    // Quitamos la cabecera "data:image/jpeg;base64," para mandarlo limpio
+    const base64Data = base64Image.split(',')[1];
+
+    statusText.textContent = 'La IA de Google está analizando el ticket...';
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const payload = {
+      contents: [{
+        parts: [
+          { text: `Eres un experto asistente financiero. Lee cuidadosamente este ticket y devuelve un JSON estrictamente válido. 
+                  Reglas:
+                  - 'fecha': formato DD/MM/AAAA. Si no la encuentras pon null.
+                  - 'monto': un número de coma flotante representando el total gastado. Si no hay, pon null.
+                  - 'concepto': una breve descripción (máximo 3 palabras) del lugar o de lo que se compró.
+                  - 'ciudad': la ciudad de la compra si es visible. Si no, pon null.` },
+          { inline_data: { mime_type: "image/jpeg", data: base64Data } }
+        ]
+      }],
+      generationConfig: { 
+        response_mime_type: "application/json" 
+      }
+    };
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error?.message || `Error HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const textResponse = data.candidates[0].content.parts[0].text;
+    const ticketInfo = JSON.parse(textResponse);
+
+    // Llenar los inputs automáticamente
+    if (ticketInfo.ciudad) document.getElementById('fCiudad').value = ticketInfo.ciudad;
+    if (ticketInfo.fecha) document.getElementById('fFecha').value = ticketInfo.fecha;
+    if (ticketInfo.concepto) document.getElementById('fConcepto').value = ticketInfo.concepto;
+    if (ticketInfo.monto) document.getElementById('fMonto').value = ticketInfo.monto;
+
+    document.getElementById('ocrRaw').textContent = JSON.stringify(ticketInfo, null, 2);
+
+    statusText.textContent = '¡Listo! Revisa si los campos extraídos son correctos.';
+    setTimeout(() => statusEl.classList.remove('show'), 4000);
+
+  } catch (err) {
+    statusText.textContent = 'Error procesando con Gemini, llena los campos a mano.';
+    document.getElementById('ocrRaw').textContent = `(Error: ${err.message})`;
+    setTimeout(() => statusEl.classList.remove('show'), 5000);
+  }
+}
+
+document.getElementById('cancelRowBtn').addEventListener('click', resetUploadArea);
+function resetUploadArea() {
+  currentFile = null;
+  document.getElementById('previewArea').classList.remove('open');
+  fileInput.value = '';
+}
+
+/* ---------------- drive upload ---------------- */
+async function apiCall(url, options) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (data && data.error && data.error.message) ? data.error.message : `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function ensureFolder() {
+  if (folderId && (folderId === 'undefined' || folderId === 'null')) {
+    folderId = null;
+    localStorage.removeItem('ticketsFolderId');
+  }
+  if (folderId) return folderId;
+
+  const q = encodeURIComponent("name='TicketsGastos' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const listRes = await apiCall(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+    headers: { Authorization: 'Bearer ' + accessToken }
+  });
+
+  if (listRes.files && listRes.files.length) {
+    folderId = listRes.files[0].id;
+  } else {
+    const createRes = await apiCall('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'TicketsGastos', mimeType: 'application/vnd.google-apps.folder' })
+    });
+    folderId = createRes.id;
+  }
+
+  if (!folderId) throw new Error('No se pudo crear ni encontrar la carpeta TicketsGastos en Drive.');
+  localStorage.setItem('ticketsFolderId', folderId);
+  return folderId;
+}
+
+async function uploadToDrive(file, fileName) {
+  const fId = await ensureFolder();
+
+  const metaRes = await apiCall('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: fileName, parents: [fId] })
+  });
+  if (!metaRes.id) throw new Error('Google no devolvió un ID de archivo al crearlo.');
+
+  await apiCall(`https://www.googleapis.com/upload/drive/v3/files/${metaRes.id}?uploadType=media`, {
+    method: 'PATCH',
+    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': file.type },
+    body: file
+  });
+
+  const info = await apiCall(`https://www.googleapis.com/drive/v3/files/${metaRes.id}?fields=webViewLink`, {
+    headers: { Authorization: 'Bearer ' + accessToken }
+  });
+
+  return info.webViewLink;
+}
+
+/* ---------------- save row ---------------- */
+document.getElementById('saveRowBtn').addEventListener('click', async () => {
+  if (!currentFile) { alert('Primero sube una foto del ticket.'); return; }
+  if (!accessToken) { alert('Conecta tu Google Drive primero (paso 1).'); return; }
+
+  const btn = document.getElementById('saveRowBtn');
+  btn.disabled = true; btn.textContent = 'Subiendo…';
+
+  try {
+    const ciudad = document.getElementById('fCiudad').value.trim();
+    const fecha = document.getElementById('fFecha').value.trim();
+    const concepto = document.getElementById('fConcepto').value.trim();
+    const monto = document.getElementById('fMonto').value.trim();
+    const comentarios = document.getElementById('fComentarios').value.trim();
+    const fileName = `${fecha || 'sinfecha'}_${ciudad || 'ticket'}_${Date.now()}.jpg`;
+
+    const link = await uploadToDrive(currentFile, fileName);
+
+    entries.push({ ciudad, fecha, concepto, monto, link, comentarios });
+    saveEntries();
+    renderTable();
+    resetUploadArea();
+  } catch (err) {
+    alert('Error al subir a Drive: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Subir a Drive y guardar fila';
+  }
+});
+
+/* ---------------- table ---------------- */
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  document.getElementById('rowCount').textContent = entries.length;
+  if (!entries.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Todavía no hay filas. Registra tu primer ticket arriba.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = entries.map((e, i) => `
+    <tr>
+      <td>${escapeHtml(e.ciudad)}</td>
+      <td>${escapeHtml(e.fecha)}</td>
+      <td>${escapeHtml(e.concepto)}</td>
+      <td class="money">$${e.monto || '0.00'}</td>
+      <td class="link-cell"><a href="${e.link}" target="_blank">ver foto</a></td>
+      <td>${escapeHtml(e.comentarios)}</td>
+      <td><button class="del-btn" onclick="deleteRow(${i})" title="Eliminar">✕</button></td>
+    </tr>
+  `).join('');
+}
+function deleteRow(i) { entries.splice(i, 1); saveEntries(); renderTable(); }
+
+/* pinta las filas ya guardadas apenas carga la página */
+renderTable();
+function escapeHtml(s) { return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------------- export ---------------- */
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!entries.length) { alert('No hay filas para exportar todavía.'); return; }
+  const data = [
+    ['CIUDAD','FECHA','CONCEPTO','MONTO TOTAL MXN','FOTO TICKET','COMENTARIOS'],
+    ...entries.map(e => [e.ciudad, e.fecha, e.concepto, parseFloat(e.monto)||0, e.link, e.comentarios])
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{wch:14},{wch:12},{wch:18},{wch:16},{wch:40},{wch:24}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Tickets');
+  XLSX.writeFile(wb, `registro_tickets_${new Date().toISOString().slice(0,10)}.xlsx`);
+});
+</script>
+</body>
+</html>
