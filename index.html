@@ -610,6 +610,7 @@ async function uploadToDrive(file, fileName) {
 }
 
 /* ---------------- save row ---------------- */
+/* ---------------- save row ---------------- */
 document.getElementById('saveRowBtn').addEventListener('click', async () => {
   if (!currentFile) { alert('Primero sube una foto del ticket.'); return; }
   if (!accessToken) { alert('Conecta tu Google Drive primero (paso 1).'); return; }
@@ -617,7 +618,7 @@ document.getElementById('saveRowBtn').addEventListener('click', async () => {
   const btn = document.getElementById('saveRowBtn');
   btn.disabled = true; btn.textContent = 'Subiendo…';
 
-try {
+  try {
     const ciudad = document.getElementById('fCiudad').value.trim();
     const fecha = document.getElementById('fFecha').value.trim();
     const concepto = document.getElementById('fConcepto').value.trim();
@@ -645,6 +646,7 @@ try {
   } finally {
     btn.disabled = false; btn.textContent = 'Subir a Drive y guardar fila';
   }
+});
 
 /* ---------------- table ---------------- */
 function renderTable() {
