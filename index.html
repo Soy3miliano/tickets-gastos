@@ -465,7 +465,7 @@ async function runGeminiAI(imageUrl) {
 
     statusText.textContent = 'La IA de Google está analizando el ticket...';
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${apiKey}`;
     const payload = {
       contents: [{
         parts: [
