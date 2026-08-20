@@ -617,13 +617,22 @@ document.getElementById('saveRowBtn').addEventListener('click', async () => {
   const btn = document.getElementById('saveRowBtn');
   btn.disabled = true; btn.textContent = 'Subiendo…';
 
-  try {
+try {
     const ciudad = document.getElementById('fCiudad').value.trim();
     const fecha = document.getElementById('fFecha').value.trim();
     const concepto = document.getElementById('fConcepto').value.trim();
     const monto = document.getElementById('fMonto').value.trim();
     const comentarios = document.getElementById('fComentarios').value.trim();
-    const fileName = `${fecha || 'sinfecha'}_${ciudad || 'ticket'}_${Date.now()}.jpg`;
+    
+    // --- NUEVO FORMATO DE NOMBRE ---
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const hoy = new Date();
+    const mesActual = meses[hoy.getMonth()];
+    const anioActual = hoy.getFullYear();
+    
+    // Formato: Matrícula_MesAño_IDÚnico.jpg 
+    const fileName = `A07106914_${mesActual}${anioActual}_${Date.now()}.jpg`;
+    // -------------------------------
 
     const link = await uploadToDrive(currentFile, fileName);
 
@@ -636,7 +645,6 @@ document.getElementById('saveRowBtn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false; btn.textContent = 'Subir a Drive y guardar fila';
   }
-});
 
 /* ---------------- table ---------------- */
 function renderTable() {
